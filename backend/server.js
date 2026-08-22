@@ -46,6 +46,20 @@ function initializeDatabase() {
       )
     `);
 
+    // Break records table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS break_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        staff_id INTEGER NOT NULL,
+        attendance_id INTEGER NOT NULL,
+        break_start_time DATETIME,
+        break_end_time DATETIME,
+        date DATE,
+        FOREIGN KEY(staff_id) REFERENCES staff(id),
+        FOREIGN KEY(attendance_id) REFERENCES attendance(id)
+      )
+    `);
+
     // Initialize with 10 default staff members if empty
     db.get('SELECT COUNT(*) as count FROM staff', (err, row) => {
       if (err) {
@@ -157,18 +171,138 @@ app.post('/api/attendance/check-out', (req, res) => {
   );
 });
 
-// Get today's attendance for a staff member
-app.get('/api/attendance/today/:staff_id', (req, res) => {
+// Break start
+app.post('/api/attendance/break-start', (req, res) => {
+  const { staff_id } = req.body;
   const today = new Date().toISOString().split('T')[0];
+  const breakStartTime = new Date().toISOString();
+
+  // Get today's attendance record
   db.get(
-    'SELECT * FROM attendance WHERE staff_id = ? AND date = ?',
-    [req.params.staff_id, today],
+    'SELECT id FROM attendance WHERE staff_id = ? AND date = ? AND check_in_time IS NOT NULL AND check_out_time IS NULL',
+    [staff_id, today],
     (err, row) => {
       if (err) {
         res.status(500).json({ error: err.message });
         return;
       }
-      res.json(row || { message: 'No records for today' });
+      if (!row) {
+        res.status(400).json({ error: 'No active check-in found' });
+        return;
+      }
+
+      // Check if already on break
+      db.get(
+        'SELECT * FROM break_records WHERE staff_id = ? AND date = ? AND break_start_time IS NOT NULL AND break_end_time IS NULL',
+        [staff_id, today],
+        (err, breakRow) => {
+          if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+          }
+          if (breakRow) {
+            res.status(400).json({ error: 'Already on break' });
+            return;
+          }
+
+          // Insert break start record
+          db.run(
+            'INSERT INTO break_records (staff_id, attendance_id, break_start_time, date) VALUES (?, ?, ?, ?)',
+            [staff_id, row.id, breakStartTime, today],
+            function(err) {
+              if (err) {
+                res.status(500).json({ error: err.message });
+                return;
+              }
+              res.json({ id: this.lastID, break_start_time: breakStartTime });
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Break end
+app.post('/api/attendance/break-end', (req, res) => {
+  const { staff_id } = req.body;
+  const today = new Date().toISOString().split('T')[0];
+  const breakEndTime = new Date().toISOString();
+
+  db.run(
+    'UPDATE break_records SET break_end_time = ? WHERE staff_id = ? AND date = ? AND break_start_time IS NOT NULL AND break_end_time IS NULL',
+    [breakEndTime, staff_id, today],
+    function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      if (this.changes === 0) {
+        res.status(400).json({ error: 'No active break found' });
+        return;
+      }
+      res.json({ break_end_time: breakEndTime });
+    }
+  );
+});
+
+// Get today's attendance and break records for a staff member
+app.get('/api/attendance/today/:staff_id', (req, res) => {
+  const today = new Date().toISOString().split('T')[0];
+  db.get(
+    'SELECT * FROM attendance WHERE staff_id = ? AND date = ?',
+    [req.params.staff_id, today],
+    (err, attendanceRow) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+
+      if (!attendanceRow) {
+        res.json({ message: 'No records for today' });
+        return;
+      }
+
+      // Get break records for today
+      db.all(
+        'SELECT * FROM break_records WHERE staff_id = ? AND date = ? ORDER BY break_start_time',
+        [req.params.staff_id, today],
+        (err, breakRows) => {
+          if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+          }
+
+          // Calculate total break time
+          let totalBreakMinutes = 0;
+          breakRows.forEach(breakRecord => {
+            if (breakRecord.break_start_time && breakRecord.break_end_time) {
+              const breakStart = new Date(breakRecord.break_start_time);
+              const breakEnd = new Date(breakRecord.break_end_time);
+              const minutes = (breakEnd - breakStart) / (1000 * 60);
+              totalBreakMinutes += minutes;
+            }
+          });
+
+          // Calculate actual working hours (excluding breaks)
+          let actualWorkingMinutes = 0;
+          if (attendanceRow.check_in_time && attendanceRow.check_out_time) {
+            const checkIn = new Date(attendanceRow.check_in_time);
+            const checkOut = new Date(attendanceRow.check_out_time);
+            const totalMinutes = (checkOut - checkIn) / (1000 * 60);
+            actualWorkingMinutes = totalMinutes - totalBreakMinutes;
+          }
+
+          res.json({
+            attendance: attendanceRow,
+            breaks: breakRows,
+            totalBreakMinutes: Math.round(totalBreakMinutes),
+            totalBreakHours: Math.floor(totalBreakMinutes / 60),
+            actualWorkingMinutes: Math.round(actualWorkingMinutes),
+            actualWorkingHours: Math.floor(actualWorkingMinutes / 60)
+          });
+        }
+      );
     }
   );
 });
@@ -187,19 +321,53 @@ app.get('/api/attendance/monthly/:staff_id/:year/:month', (req, res) => {
         res.status(500).json({ error: err.message });
         return;
       }
-      // Calculate total working hours
-      let totalMinutes = 0;
-      rows.forEach(row => {
-        if (row.check_in_time && row.check_out_time) {
-          const checkIn = new Date(row.check_in_time);
-          const checkOut = new Date(row.check_out_time);
-          const minutes = (checkOut - checkIn) / (1000 * 60);
-          totalMinutes += minutes;
+
+      // Get all break records for the month
+      db.all(
+        `SELECT * FROM break_records WHERE staff_id = ? AND date LIKE ?`,
+        [staff_id, `${yearMonth}%`],
+        (err, breakRows) => {
+          if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+          }
+
+          // Calculate total working hours and break time
+          let totalWorkingMinutes = 0;
+          let totalBreakMinutes = 0;
+
+          rows.forEach(row => {
+            if (row.check_in_time && row.check_out_time) {
+              const checkIn = new Date(row.check_in_time);
+              const checkOut = new Date(row.check_out_time);
+              const minutes = (checkOut - checkIn) / (1000 * 60);
+              totalWorkingMinutes += minutes;
+            }
+          });
+
+          breakRows.forEach(breakRecord => {
+            if (breakRecord.break_start_time && breakRecord.break_end_time) {
+              const breakStart = new Date(breakRecord.break_start_time);
+              const breakEnd = new Date(breakRecord.break_end_time);
+              const minutes = (breakEnd - breakStart) / (1000 * 60);
+              totalBreakMinutes += minutes;
+            }
+          });
+
+          const actualWorkingMinutes = totalWorkingMinutes - totalBreakMinutes;
+
+          res.json({
+            records: rows,
+            breakRecords: breakRows,
+            totalHours: Math.floor(totalWorkingMinutes / 60),
+            totalMinutes: totalWorkingMinutes % 60,
+            totalBreakHours: Math.floor(totalBreakMinutes / 60),
+            totalBreakMinutes: totalBreakMinutes % 60,
+            actualWorkingHours: Math.floor(actualWorkingMinutes / 60),
+            actualWorkingMinutes: actualWorkingMinutes % 60
+          });
         }
-      });
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = totalMinutes % 60;
-      res.json({ records: rows, totalHours: hours, totalMinutes: minutes });
+      );
     }
   );
 });
@@ -208,7 +376,7 @@ app.get('/api/attendance/monthly/:staff_id/:year/:month', (req, res) => {
 app.get('/api/attendance/all-today', (req, res) => {
   const today = new Date().toISOString().split('T')[0];
   db.all(
-    `SELECT s.id, s.name, a.check_in_time, a.check_out_time FROM staff s
+    `SELECT s.id, s.name, a.id as attendance_id, a.check_in_time, a.check_out_time FROM staff s
      LEFT JOIN attendance a ON s.id = a.staff_id AND a.date = ?
      ORDER BY s.name`,
     [today],
@@ -217,24 +385,50 @@ app.get('/api/attendance/all-today', (req, res) => {
         res.status(500).json({ error: err.message });
         return;
       }
-      const staffAttendance = rows.reduce((acc, row) => {
-        const staffId = row.id;
-        if (!acc[staffId]) {
-          acc[staffId] = {
-            id: row.id,
-            name: row.name,
-            records: []
-          };
-        }
-        if (row.check_in_time || row.check_out_time) {
-          acc[staffId].records.push({
-            check_in_time: row.check_in_time,
-            check_out_time: row.check_out_time
+
+      // Fetch break records for all staff
+      db.all(
+        `SELECT * FROM break_records WHERE date = ?`,
+        [today],
+        (err, breakRows) => {
+          if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+          }
+
+          const staffAttendance = rows.reduce((acc, row) => {
+            const staffId = row.id;
+            if (!acc[staffId]) {
+              acc[staffId] = {
+                id: row.id,
+                name: row.name,
+                records: [],
+                breaks: []
+              };
+            }
+            if (row.check_in_time || row.check_out_time) {
+              acc[staffId].records.push({
+                check_in_time: row.check_in_time,
+                check_out_time: row.check_out_time
+              });
+            }
+            return acc;
+          }, {});
+
+          // Add break records
+          breakRows.forEach(breakRecord => {
+            const staffId = breakRecord.staff_id;
+            if (staffAttendance[staffId]) {
+              staffAttendance[staffId].breaks.push({
+                break_start_time: breakRecord.break_start_time,
+                break_end_time: breakRecord.break_end_time
+              });
+            }
           });
+
+          res.json(Object.values(staffAttendance));
         }
-        return acc;
-      }, {});
-      res.json(Object.values(staffAttendance));
+      );
     }
   );
 });
@@ -255,31 +449,66 @@ app.get('/api/attendance/all-monthly/:year/:month', (req, res) => {
         res.status(500).json({ error: err.message });
         return;
       }
-      const staffAttendance = rows.reduce((acc, row) => {
-        const staffId = row.id;
-        if (!acc[staffId]) {
-          acc[staffId] = {
-            id: row.id,
-            name: row.name,
-            totalMinutes: 0,
-            recordCount: 0
-          };
+
+      // Get all break records for the month
+      db.all(
+        `SELECT * FROM break_records WHERE date LIKE ?`,
+        [`${yearMonth}%`],
+        (err, breakRows) => {
+          if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+          }
+
+          const staffAttendance = rows.reduce((acc, row) => {
+            const staffId = row.id;
+            if (!acc[staffId]) {
+              acc[staffId] = {
+                id: row.id,
+                name: row.name,
+                totalMinutes: 0,
+                totalBreakMinutes: 0,
+                recordCount: 0
+              };
+            }
+            if (row.check_in_time && row.check_out_time) {
+              const checkIn = new Date(row.check_in_time);
+              const checkOut = new Date(row.check_out_time);
+              const minutes = (checkOut - checkIn) / (1000 * 60);
+              acc[staffId].totalMinutes += minutes;
+              acc[staffId].recordCount += 1;
+            }
+            return acc;
+          }, {});
+
+          // Calculate break times
+          breakRows.forEach(breakRecord => {
+            const staffId = breakRecord.staff_id;
+            if (staffAttendance[staffId]) {
+              if (breakRecord.break_start_time && breakRecord.break_end_time) {
+                const breakStart = new Date(breakRecord.break_start_time);
+                const breakEnd = new Date(breakRecord.break_end_time);
+                const minutes = (breakEnd - breakStart) / (1000 * 60);
+                staffAttendance[staffId].totalBreakMinutes += minutes;
+              }
+            }
+          });
+
+          const result = Object.values(staffAttendance).map(staff => {
+            const actualWorkingMinutes = staff.totalMinutes - staff.totalBreakMinutes;
+            return {
+              ...staff,
+              totalHours: Math.floor(staff.totalMinutes / 60),
+              totalMinutes: staff.totalMinutes % 60,
+              totalBreakHours: Math.floor(staff.totalBreakMinutes / 60),
+              totalBreakMinutes: staff.totalBreakMinutes % 60,
+              actualWorkingHours: Math.floor(actualWorkingMinutes / 60),
+              actualWorkingMinutes: actualWorkingMinutes % 60
+            };
+          });
+          res.json(result);
         }
-        if (row.check_in_time && row.check_out_time) {
-          const checkIn = new Date(row.check_in_time);
-          const checkOut = new Date(row.check_out_time);
-          const minutes = (checkOut - checkIn) / (1000 * 60);
-          acc[staffId].totalMinutes += minutes;
-          acc[staffId].recordCount += 1;
-        }
-        return acc;
-      }, {});
-      const result = Object.values(staffAttendance).map(staff => ({
-        ...staff,
-        totalHours: Math.floor(staff.totalMinutes / 60),
-        totalMinutes: staff.totalMinutes % 60
-      }));
-      res.json(result);
+      );
     }
   );
 });
