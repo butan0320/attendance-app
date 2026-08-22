@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>勤怠管理アプリ</title>
+
+<style>
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+}
+
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;
+  background:#f3f4f6;
+  min-height:100vh;
+  padding:12px;
+  color:#222;
+}
+
+.container{
+  max-width:900px;
+  margin:auto;
+  background:white;
+  border-radius:18px;
+  overflow:hidden;
+  box-shadow:0 4px 18px rgba(0,0,0,.12);
+}
+
+.header{
+  background:linear-gradient(135deg,#667eea,#764ba2);
+  color:white;
+  padding:25px 18px;
+  text-align:center;
+}
+
+.header h1{
+  font-size:30px;
+  margin-bottom:8px;
+}
+
+.header p{
+  font-size:16px;
+}
+
+.content{
+  padding:18px;
+}
+
+label{
+  display:block;
+  font-weight:bold;
+  margin-bottom:8px;
+}
+
+select,
+input{
+  width:100%;
+  padding:17px;
+  font-size:20px;
+  border:2px solid #ddd;
+  border-radius:12px;
+  background:white;
+}
+
+.staff-selection{
+  margin-bottom:15px;
+}
+
+.status{
+  text-align:center;
+  padding:14px;
+  border-radius:12px;
+  background:#f3f4f6;
+  font-size:18px;
+  font-weight:bold;
+  margin-bottom:15px;
+}
+
+.button-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-bottom:22px;
+}
+
+.btn{
+  min-height:75px;
+  border:none;
+  border-radius:14px;
+  color:white;
+  font-size:21px;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+.btn:disabled{
+  opacity:.35;
+}
+
+.green{
+  background:#22a447;
+}
+
+.orange{
+  background:#f59e0b;
+}
+
+.red{
+  background:#e53935;
+}
+
+.blue{
+  background:#4f46e5;
+}
+
+.gray{
+  background:#6b7280;
+}
+
+.stats{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-bottom:20px;
+}
+
+.stat{
+  background:#f3f4f6;
+  padding:18px;
+  border-radius:14px;
+  text-align:center;
+}
+
+.stat-title{
+  font-size:14px;
+  color:#666;
+  margin-bottom:8px;
+  font-weight:bold;
+}
+
+.stat-value{
+  font-size:25px;
+  font-weight:bold;
+}
+
+.tabs{
+  display:flex;
+  gap:8px;
+  margin-bottom:15px;
+}
+
+.tab{
+  flex:1;
+  padding:15px;
+  border:none;
+  border-radius:10px;
+  background:#eee;
+  font-size:17px;
+  font-weight:bold;
+}
+
+.tab.active{
+  background:#667eea;
+  color:white;
+}
+
+.panel{
+  display:none;
+}
+
+.panel.active{
+  display:block;
+}
+
+.card{
+  background:#f8f9fb;
+  border:1px solid #e5e7eb;
+  border-radius:14px;
+  padding:15px;
+  margin-bottom:10px;
+}
+
+.card h3{
+  margin-bottom:8px;
+}
+
+.status-working{
+  color:#198754;
+  font-weight:bold;
+}
+
+.status-break{
+  color:#d97706;
+  font-weight:bold;
+}
+
+.status-off{
+  color:#777;
+}
+
+.admin{
+  margin-top:15px;
+  width:100%;
+}
+
+.admin-panel{
+  display:none;
+  border-top:2px solid #eee;
+  margin-top:20px;
+  padding-top:20px;
+}
+
+.admin-panel.active{
+  display:block;
+}
+
+.admin-buttons{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:15px;
+}
+
+.small-btn{
+  padding:15px;
+  border:none;
+  border-radius:10px;
+  font-weight:bold;
+  font-size:16px;
+}
+
+.danger{
+  background:#dc2626;
+  color:white;
+}
+
+.notice{
+  background:#fff7ed;
+  border:1px solid #fed7aa;
+  padding:12px;
+  border-radius:10px;
+  margin-bottom:15px;
+}
+
+.modal{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.7);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  z-index:100;
+}
+
+.modal.show{
+  display:flex;
+}
+
+.modal-box{
+  background:white;
+  width:min(430px,100%);
+  padding:22px;
+  border-radius:16px;
+}
+
+.modal-box h2{
+  margin-bottom:12px;
+}
+
+.modal-buttons{
+  display:flex;
+  gap:10px;
+  margin-top:14px;
+}
+
+.modal-buttons button{
+  flex:1;
+  padding:15px;
+  border:none;
+  border-radius:10px;
+  font-weight:bold;
+}
+
+@media(max-width:600px){
+
+  .header h1{
+    font-size:25px;
+  }
+
+  .btn{
+    font-size:18px;
+    min-height:70px;
+  }
+
+  .stat-value{
+    font-size:21px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="header">
+<h1>📋 勤怠管理アプリ</h1>
+<p id="currentDate"></p>
+</div>
+
+<div class="content">
+
+<div class="staff-selection">
+<label>スタッフを選択</label>
+
+<select id="staffSelect">
+<option value="">-- 選択してください --</option>
+</select>
+</div>
+
+<div id="status" class="status">
+スタッフを選択してください
+</div>
+
+<div class="button-grid">
+
+<button id="checkInBtn" class="btn green" disabled>
+🟢 出勤
+</button>
+
+<button id="breakStartBtn" class="btn orange" disabled>
+☕ 休憩開始
+</button>
+
+<button id="breakEndBtn" class="btn orange" disabled>
+▶️ 休憩終了
+</button>
+
+<button id="checkOutBtn" class="btn red" disabled>
+🔴 退勤
+</button>
+
+</div>
+
+<div class="stats">
+
+<div class="stat">
+<div class="stat-title">今日の実働</div>
+<div class="stat-value" id="todayHours">
+0時間0分
+</div>
+</div>
+
+<div class="stat">
+<div class="stat-title">今月の実働</div>
+<div class="stat-value" id="monthlyHours">
+0時間0分
+</div>
+</div>
+
+</div>
+
+<div class="tabs">
+
+<button class="tab active" data-tab="todayPanel">
+今日の記録
+</button>
+
+<button class="tab" data-tab="staffPanel">
+スタッフ一覧
+</button>
+
+</div>
+
+<div id="todayPanel" class="panel active"></div>
+
+<div id="staffPanel" class="panel"></div>
+
+<button id="adminBtn" class="btn blue admin">
+🔐 店長管理画面
+</button>
+
+<div id="adminPanel" class="admin-panel">
+
+<div class="notice">
+🔐 店長専用画面です。
+</div>
+
+<label>
+履歴を見る日付
+</label>
+
+<input type="date" id="historyDate">
+
+<div id="history" style="margin-top:15px;"></div>
+
+<h2 style="margin-top:20px;margin-bottom:12px;">
+📊 今月の集計
+</h2>
+
+<div id="monthlyAdmin"></div>
+
+<div class="admin-buttons">
+
+<button id="changePasswordBtn" class="small-btn">
+🔑 パスワード変更
+</button>
+
+<button id="resetBtn" class="small-btn danger">
+🗑️ 全データ削除
+</button>
+
+</div>
+
+</div>
+
+</div>
+</div>
+
+<div id="passwordModal" class="modal">
+
+<div class="modal-box">
+
+<h2 id="modalTitle">
+🔐 店長パスワード
+</h2>
+
+<p id="modalText" style="margin-bottom:12px;color:#666;">
+パスワードを入力してください。
+</p>
+
+<input
+type="password"
+id="passwordInput"
+placeholder="パスワード"
+autocomplete="off"
+>
+
+<div class="modal-buttons">
+
+<button id="cancelModal">
+キャンセル
+</button>
+
+<button id="confirmModal" class="blue">
+確認
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+const STAFF_NAMES = [
+"店長",
+"りり",
+"ゆうな",
+"せいや",
+"たかや",
+"サノー",
+"なるひと",
+"ひな",
+"その他①",
+"その他②",
+"その他③",
+"その他④",
+"その他⑤"
+];
+
+const STORAGE_KEY = "attendanceData_v3";
+const PASSWORD_KEY = "managerPassword_v1";
+
+let modalMode = "login";
+
+function getData(){
+
+  try{
+
+    return JSON.parse(
+      localStorage.getItem(STORAGE_KEY)
+    ) || {records:{}};
+
+  }catch{
+
+    return {records:{}};
+
+  }
+
+}
+
+function saveData(data){
+
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify(data)
+  );
+
+}
+
+function today(){
+
+  return new Date()
+  .toLocaleDateString("sv-SE");
+
+}
+
+function nowTime(){
+
+  return new Date()
+  .toLocaleTimeString(
+    "ja-JP",
+    {
+      hour:"2-digit",
+      minute:"2-digit",
+      hour12:false
+    }
+  );
+
+}
+
+function minutesBetween(start,end){
+
+  const a = new Date(
+    "2000-01-01T" + start + ":00"
+  );
+
+  const b = new Date(
+    "2000-01-01T" + end + ":00"
+  );
+
+  let minutes =
+    Math.round((b-a)/60000);
+
+  if(minutes < 0){
+    minutes += 1440;
+  }
+
+  return minutes;
+
+}
+
+function formatMinutes(minutes){
+
+  minutes =
+    Math.max(0,Math.round(minutes));
+
+  return (
+    Math.floor(minutes/60)
+    +
+    "時間"
+    +
+    (minutes%60)
+    +
+    "分"
+  );
+
+}
+
+function recordsFor(name){
+
+  const data = getData();
+
+  return data.records[name] || [];
+
+}
+
+function activeRecord(name){
+
+  return recordsFor(name)
+  .find(
+    r =>
+      r.date === today()
+      &&
+      !r.checkOut
+  );
+
+}
+
+function recordMinutes(record){
+
+  if(!record.checkIn){
+
+    return 0;
+
+  }
+
+  const end =
+    record.checkOut || nowTime();
+
+  let total =
+    minutesBetween(
+      record.checkIn,
+      end
+    );
+
+  if(
+    record.breakStart
+    &&
+    record.breakEnd
+  ){
+
+    total -=
+      minutesBetween(
+        record.breakStart,
+        record.breakEnd
+      );
+
+  }
+
+  if(
+    record.breakStart
+    &&
+    !record.breakEnd
+  ){
+
+    total -=
+      minutesBetween(
+        record.breakStart,
+        nowTime()
+      );
+
+  }
+
+  return Math.max(0,total);
+
+}
+
+function todayTotal(name){
+
+  return recordsFor(name)
+  .filter(r => r.date === today())
+  .reduce(
+    (total,r) =>
+      total + recordMinutes(r),
+    0
+  );
+
+}
+
+function monthlyTotal(name){
+
+  const month =
+    today().slice(0,7);
+
+  return recordsFor(name)
+  .filter(
+    r => r.date.startsWith(month)
+  )
+  .reduce(
+    (total,r) =>
+      total + recordMinutes(r),
+    0
+  );
+
+}
+
+function updateButtons(){
+
+  const name =
+    document.getElementById(
+      "staffSelect"
+    ).value;
+
+  const record =
+    name ? activeRecord(name) : null;
+
+  const inBtn =
+    document.getElementById(
+      "checkInBtn"
+    );
+
+  const breakStart =
+    document.getElementById(
+      "breakStartBtn"
+    );
+
+  const breakEnd =
+    document.getElementById(
+      "breakEndBtn"
+    );
+
+  const outBtn =
+    document.getElementById(
+      "checkOutBtn"
+    );
+
+  if(!name){
+
+    inBtn.disabled = true;
+    breakStart.disabled = true;
+    breakEnd.disabled = true;
+    outBtn.disabled = true;
+
+    document.getElementById(
+      "status"
+    ).textContent =
+      "スタッフを選択してください";
+
+    return;
+
+  }
+
+  inBtn.disabled = !!record;
+
+  outBtn.disabled = !record;
+
+  breakStart.disabled =
+    !record || !!record.breakStart;
+
+  breakEnd.disabled =
+    !record ||
+    !record.breakStart ||
+    !!record.breakEnd;
+
+  if(!record){
+
+    document.getElementById(
+      "status"
+    ).textContent =
+      "本日は未出勤";
+
+  }else if(
+    record.breakStart &&
+    !record.breakEnd
+  ){
+
+    document.getElementById(
+      "status"
+    ).textContent =
+      "☕ 休憩中";
+
+  }else{
+
+    document.getElementById(
+      "status"
+    ).textContent =
+      "🟢 勤務中";
+
+  }
+
+}
+
+function updateStats(){
+
+  const name =
+    document.getElementById(
+      "staffSelect"
+    ).value;
+
+  document.getElementById(
+    "todayHours"
+  ).textContent =
+    name
+    ? formatMinutes(todayTotal(name))
+    : "0時間0分";
+
+  document.getElementById(
+    "monthlyHours"
+  ).textContent =
+    name
+    ? formatMinutes(monthlyTotal(name))
+    : "0時間0分";
+
+}
+
+function renderToday(){
+
+  const box =
+    document.getElementById(
+      "todayPanel"
+    );
+
+  const name =
+    document.getElementById(
+      "staffSelect"
+    ).value;
+
+  if(!name){
+
+    box.innerHTML =
+      '<div class="card">スタッフを選択してください</div>';
+
+    return;
+
+  }
+
+  const rows =
+    recordsFor(name)
+    .filter(r => r.date === today());
+
+  if(!rows.length){
+
+    box.innerHTML =
+      '<div class="card">今日の記録はありません</div>';
+
+    return;
+
+  }
+
+  box.innerHTML =
+    rows.map(r => `
+
+      <div class="card">
+
+        <h3>${name}</h3>
+
+        <div>
+          出勤：${r.checkIn || "-"}
+        </div>
+
+        <div>
+          退勤：${r.checkOut || "勤務中"}
+        </div>
+
+        <div>
+          休憩：
+          ${
+            r.breakStart
+            ?
+            r.breakStart +
+            "〜" +
+            (r.breakEnd || "休憩中")
+            :
+            "なし"
+          }
+        </div>
+
+        <div
+          class="${
+            r.checkOut
+            ? "status-working"
+            : "status-break"
+          }"
+          style="margin-top:8px;"
+        >
+          実働：
+          ${formatMinutes(recordMinutes(r))}
+        </div>
+
+      </div>
+
+    `).join("");
+
+}
+
+function renderStaff(){
+
+  const box =
+    document.getElementById(
+      "staffPanel"
+    );
+
+  box.innerHTML =
+    STAFF_NAMES.map(name => {
+
+      const record =
+        activeRecord(name);
+
+      let status =
+        "未出勤";
+
+      let className =
+        "status-off";
+
+      if(record){
+
+        if(
+          record.breakStart &&
+          !record.breakEnd
+        ){
+
+          status = "☕ 休憩中";
+          className = "status-break";
+
+        }else{
+
+          status = "🟢 勤務中";
+          className = "status-working";
+
+        }
+
+      }
+
+      return `
+
+        <div class="card">
+
+          <h3>${name}</h3>
+
+          <div class="${className}">
+            ${status}
+          </div>
+
+          <div>
+            今日：
+            ${formatMinutes(todayTotal(name))}
+          </div>
+
+          <div style="margin-top:5px;">
+            今月：
+            <b>
+              ${formatMinutes(monthlyTotal(name))}
+            </b>
+          </div>
+
+        </div>
+
+      `;
+
+    }).join("");
+
+}
+
+function renderHistory(){
+
+  const admin =
+    document.getElementById(
+      "adminPanel"
+    );
+
+  if(!admin.classList.contains("active")){
+    return;
+  }
+
+  const date =
+    document.getElementById(
+      "historyDate"
+    ).value;
+
+  const box =
+    document.getElementById(
+      "history"
+    );
+
+  let html =
+    `<h2>📅 ${date} の勤務履歴</h2>`;
+
+  let found = false;
+
+  STAFF_NAMES.forEach(name => {
+
+    recordsFor(name)
+    .filter(r => r.date === date)
+    .forEach(r => {
+
+      found = true;
+
+      html += `
+
+        <div class="card">
+
+          <h3>${name}</h3>
+
+          <div>
+            出勤：${r.checkIn || "-"}
+          </div>
+
+          <div>
+            退勤：
+            ${r.checkOut || "勤務中"}
+          </div>
+
+          <div>
+            休憩：
+            ${
+              r.breakStart
+              ?
+              r.breakStart +
+              "〜" +
+              (r.breakEnd || "休憩中")
+              :
+              "なし"
+            }
+          </div>
+
+          <div class="status-working"
+               style="margin-top:8px;">
+            実働：
+            ${formatMinutes(recordMinutes(r))}
+          </div>
+
+        </div>
+
+      `;
+
+    });
+
+  });
+
+  if(!found){
+
+    html +=
+      '<div class="card">この日の記録はありません。</div>';
+
+  }
+
+  box.innerHTML = html;
+
+}
+
+function renderMonthlyAdmin(){
+
+  const admin =
+    document.getElementById(
+      "adminPanel"
+    );
+
+  if(!admin.classList.contains("active")){
+    return;
+  }
+
+  const month =
+    today().slice(0,7);
+
+  const box =
+    document.getElementById(
+      "monthlyAdmin"
+    );
+
+  box.innerHTML =
+    STAFF_NAMES.map(name => `
+
+      <div class="card">
+
+        <b>${name}</b>
+
+        <span style="float:right;">
+          ${formatMinutes(
+            monthlyTotal(name)
+          )}
+        </span>
+
+      </div>
+
+    `).join("");
+
+}
+
+function update(){
+
+  updateButtons();
+  updateStats();
+  renderToday();
+  renderStaff();
+  renderHistory();
+  renderMonthlyAdmin();
+
+}
+
+function recordAction(action){
+
+  const name =
+    document.getElementById(
+      "staffSelect"
+    ).value;
+
+  if(!name){
+    return;
+  }
+
+  const data =
+    getData();
+
+  if(!data.records[name]){
+    data.records[name] = [];
+  }
+
+  const time =
+    nowTime();
+
+  let record =
+    activeRecord(name);
+
+  if(action === "in"){
+
+    data.records[name].push({
+
+      date:today(),
+
+      checkIn:time,
+
+      checkOut:null,
+
+      breakStart:null,
+
+      breakEnd:null
+
+    });
+
+  }
+
+  if(action === "breakStart" && record){
+
+    record.breakStart = time;
+    record.breakEnd = null;
+
+  }
+
+  if(action === "breakEnd" && record){
+
+    record.breakEnd = time;
+
+  }
+
+  if(action === "out" && record){
+
+    if(
+      record.breakStart &&
+      !record.breakEnd
+    ){
+
+      alert(
+        "休憩中です。先に「休憩終了」を押してください。"
+      );
+
+      return;
+
+    }
+
+    record.checkOut = time;
+
+  }
+
+  saveData(data);
+
+  update();
+
+}
+
+document
+.getElementById("staffSelect")
+.addEventListener(
+  "change",
+  update
+);
+
+document
+.getElementById("checkInBtn")
+.onclick =
+() => recordAction("in");
+
+document
+.getElementById("breakStartBtn")
+.onclick =
+() => recordAction("breakStart");
+
+document
+.getElementById("breakEndBtn")
+.onclick =
+() => recordAction("breakEnd");
+
+document
+.getElementById("checkOutBtn")
+.onclick =
+() => {
+
+  recordAction("out");
+
+  alert(
+    "退勤を記録しました！"
+  );
+
+};
+
+document
+.querySelectorAll(".tab")
+.forEach(button => {
+
+  button.onclick = () => {
+
+    document
+    .querySelectorAll(".tab")
+    .forEach(
+      b => b.classList.remove("active")
+    );
+
+    document
+    .querySelectorAll(".panel")
+    .forEach(
+      p => p.classList.remove("active")
+    );
+
+    button.classList.add("active");
+
+    document
+    .getElementById(
+      button.dataset.tab
+    )
+    .classList.add("active");
+
+  };
+
+});
+
+function getPassword(){
+
+  return localStorage.getItem(
+    PASSWORD_KEY
+  );
+
+}
+
+function openPasswordModal(mode){
+
+  modalMode = mode;
+
+  document
+  .getElementById(
+    "passwordInput"
+  ).value = "";
+
+  document
+  .getElementById(
+    "passwordModal"
+  )
+  .classList.add("show");
+
+}
+
+function closePasswordModal(){
+
+  document
+  .getElementById(
+    "passwordModal"
+  )
+  .classList.remove("show");
+
+}
+
+function authenticate(){
+
+  const password =
+    document
+    .getElementById(
+      "passwordInput"
+    ).value;
+
+  if(modalMode === "setup"){
+
+    if(password.length < 4){
+
+      alert(
+        "4文字以上で設定してください。"
+      );
+
+      return;
+
+    }
+
+    localStorage.setItem(
+      PASSWORD_KEY,
+      password
+    );
+
+    closePasswordModal();
+
+    openAdmin();
+
+    return;
+
+  }
+
+  if(
+    password !== getPassword()
+  ){
+
+    alert(
+      "パスワードが違います。"
+    );
+
+    return;
+
+  }
+
+  closePasswordModal();
+
+  if(modalMode === "delete"){
+
+    const confirmation =
+      prompt(
+        '削除確認です。「削除」と入力してください。'
+      );
+
+    if(
+      confirmation === "削除"
+    ){
+
+      localStorage.removeItem(
+        STORAGE_KEY
+      );
+
+      alert(
+        "全データを削除しました。"
+      );
+
+      update();
+
+    }
+
+    return;
+
+  }
+
+  if(modalMode === "change"){
+
+    const newPassword =
+      prompt(
+        "新しいパスワードを入力してください。"
+      );
+
+    if(
+      newPassword &&
+      newPassword.length >= 4
+    ){
+
+      localStorage.setItem(
+        PASSWORD_KEY,
+        newPassword
+      );
+
+      alert(
+        "パスワードを変更しました。"
+      );
+
+    }
+
+    return;
+
+  }
+
+  openAdmin();
+
+}
+
+function openAdmin(){
+
+  document
+  .getElementById(
+    "adminPanel"
+  )
+  .classList.toggle("active");
+
+  update();
+
+}
+
+document
+.getElementById("adminBtn")
+.onclick =
+() => {
+
+  if(!getPassword()){
+
+    modalMode = "setup";
+
+    document
+    .getElementById(
+      "modalTitle"
+    )
+    .textContent =
+      "🔐 店長パスワードを設定";
+
+    document
+    .getElementById(
+      "modalText"
+    )
+    .textContent =
+      "店長だけが知っているパスワードを設定してください。";
+
+    openPasswordModal("setup");
+
+  }else{
+
+    document
+    .getElementById(
+      "modalTitle"
+    )
+    .textContent =
+      "🔐 店長パスワード";
+
+    document
+    .getElementById(
+      "modalText"
+    )
+    .textContent =
+      "店長パスワードを入力してください。";
+
+    openPasswordModal("login");
+
+  }
+
+};
+
+document
+.getElementById("cancelModal")
+.onclick =
+closePasswordModal;
+
+document
+.getElementById("confirmModal")
+.onclick =
+authenticate;
+
+document
+.getElementById("resetBtn")
+.onclick =
+() => {
+
+  openPasswordModal("delete");
+
+};
+
+document
+.getElementById("changePasswordBtn")
+.onclick =
+() => {
+
+  openPasswordModal("change");
+
+};
+
+document
+.getElementById("historyDate")
+.addEventListener(
+  "change",
+  renderHistory
+);
+
+window.addEventListener(
+  "DOMContentLoaded",
+  () => {
+
+    STAFF_NAMES.forEach(name => {
+
+      const option =
+        document.createElement(
+          "option"
+        );
+
+      option.value = name;
+      option.textContent = name;
+
+      document
+      .getElementById(
+        "staffSelect"
+      )
+      .appendChild(option);
+
+    });
+
+    document
+    .getElementById(
+      "historyDate"
+    )
+    .value = today();
+
+    document
+    .getElementById(
+      "currentDate"
+    )
+    .textContent =
+      new Date().toLocaleDateString(
+        "ja-JP",
+        {
+          year:"numeric",
+          month:"long",
+          day:"numeric",
+          weekday:"long"
+        }
+      );
+
+    update();
+
+  }
+);
+
+setInterval(update,60000);
+
+</script>
+
+</body>
+</html>
